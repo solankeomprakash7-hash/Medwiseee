@@ -1,11 +1,22 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
-import firebaseConfig from '../../firebase-applet-config.json';
+import { getAnalytics } from 'firebase/analytics';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAkDRGcF8NzyK9Dp2Rn_lrPG-_w8tj913M",
+  authDomain: "medwiseee-ca199.firebaseapp.com",
+  projectId: "medwiseee-ca199",
+  storageBucket: "medwiseee-ca199.firebasestorage.app",
+  messagingSenderId: "633127348174",
+  appId: "1:633127348174:web:77900242097ab1a6106d9f",
+  measurementId: "G-RQGYNTTMW0"
+};
 
 const app = initializeApp(firebaseConfig);
+export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 export const auth = getAuth(app);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+export const db = getFirestore(app);
 
 export enum OperationType {
   CREATE = 'create',
