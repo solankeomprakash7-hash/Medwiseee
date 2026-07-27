@@ -1,0 +1,69 @@
+{
+  "entities": {
+    "antibiogram": {
+      "title": "Antibiogram Entry",
+      "description": "Local hospital susceptibility data.",
+      "type": "object",
+      "properties": {
+        "organism": { "type": "string" },
+        "antibiotic": { "type": "string" },
+        "susceptibility": { "type": "number", "description": "Percentage (0-100)" },
+        "lastUpdated": { "type": "string", "format": "date-time" },
+        "unit": { "type": "string" }
+      },
+      "required": ["organism", "antibiotic", "susceptibility"]
+    },
+    "duration_lookup": {
+      "title": "Duration Lookup",
+      "description": "Recommended duration by infection source.",
+      "type": "object",
+      "properties": {
+        "source": { "type": "string" },
+        "range": { "type": "string" },
+        "citation": { "type": "string" }
+      },
+      "required": ["source", "range"]
+    },
+    "patient_session": {
+      "title": "Patient Session",
+      "description": "Anonymized clinical session data.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "currentStage": { "type": "string" },
+        "data": { "type": "object" },
+        "completed": { "type": "boolean" }
+      },
+      "required": ["userId", "createdAt", "data"]
+    },
+    "aware_classification": {
+      "title": "AWaRe Classification",
+      "description": "WHO AWaRe categorization for antibiotics.",
+      "type": "object",
+      "properties": {
+        "antibiotic": { "type": "string" },
+        "category": { "type": "string", "enum": ["Access", "Watch", "Reserve"] }
+      },
+      "required": ["antibiotic", "category"]
+    }
+  },
+  "firestore": {
+    "antibiogram": {
+      "schema": "antibiogram",
+      "description": "Collection of local susceptibility data."
+    },
+    "duration_lookup": {
+      "schema": "duration_lookup",
+      "description": "Lookup table for antibiotic duration."
+    },
+    "patient_sessions": {
+      "schema": "patient_session",
+      "description": "Collection of user clinical sessions."
+    },
+    "aware_classification": {
+      "schema": "aware_classification",
+      "description": "Static lookup for AWaRe classes."
+    }
+  }
+}

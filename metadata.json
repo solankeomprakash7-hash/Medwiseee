@@ -1,0 +1,6 @@
+{
+  "name": "MedWise — Precision Antimicrobial Stewardship",
+  "description": "An ICU clinical decision-support system for antibiotic stewardship in sepsis, based on the latest Surviving Sepsis Campaign 2026 guidelines, incorporating patient-specific risk factors for multi-drug resistant (MDR) organisms.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

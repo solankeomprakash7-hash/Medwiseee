@@ -1,0 +1,52 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Master Gate
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isOwner(data) {
+      return isSignedIn() && data.userId == request.auth.uid;
+    }
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Antibiogram
+    match /antibiogram/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Duration Lookup
+    match /duration_lookup/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // AWaRe Classification
+    match /aware_classification/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Patient Sessions
+    match /patient_sessions/{sessionId} {
+      allow read, write: if isOwner(resource.data || request.resource.data);
+    }
+    
+    // Admins collection (protected)
+    match /admins/{userId} {
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow write: if false; // Managed via console or system
+    }
+  }
+}
