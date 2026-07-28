@@ -107,9 +107,21 @@ ${data.localAntibiogram.map(e => `- ${e.organism} vs ${e.antibiotic}: ${e.suscep
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
+      let errorData: any = {};
+      try {
+        errorData = await response.json();
+      } catch (e) {
+        // Not a JSON response
+        const text = await response.text().catch(() => 'No response body');
+        throw new Error(`Server returned ${response.status}: ${text.substring(0, 100)}`);
+      }
+
       if (errorData.type) {
-        throw new GeminiError(errorData.type, errorData.error || `Server returned ${response.status}`);
+        const err = new GeminiError(errorData.type, errorData.error || `Server returned ${response.status}`);
+        if (errorData.details) {
+          (err as any).details = errorData.details;
+        }
+        throw err;
       }
       throw new Error(errorData.error || `Server returned ${response.status}`);
     }

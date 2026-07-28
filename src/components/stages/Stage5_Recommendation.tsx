@@ -67,16 +67,16 @@ export default function Stage5_Recommendation({ data, onUpdate, onNext, onBack }
             message = 'The AI service is currently busy. Please wait a moment and try again.';
             break;
           case 'INVALID_KEY':
-            message = 'Authentication error with the AI service. Please verify configuration.';
+            message = 'Authentication error with the AI service. Please verify your configuration or API key.';
             break;
           case 'NETWORK_ERROR':
-            message = 'Network connection failure. Please check your internet and try again.';
+            message = 'Network connection failure. Please check your internet connection and try again.';
             break;
           case 'MODEL_ERROR':
-            message = 'The AI provided an incompatible response format. Retrying may help.';
+            message = 'The AI provided an incompatible response format. Retrying may help fix the parsing issue.';
             break;
           case 'ABORTED':
-            return; // Already handled above but for safety
+            return; // Already handled above
           default:
             message = err.message || 'An unexpected error occurred during clinical analysis.';
         }
@@ -84,7 +84,7 @@ export default function Stage5_Recommendation({ data, onUpdate, onNext, onBack }
       } else {
         setError({ 
           message: err.message || 'Analysis failed due to an unexpected system error. Please retry.', 
-          type: 'UNKNOWN' 
+          type: 'SYSTEM_ERROR' 
         });
       }
     } finally {
