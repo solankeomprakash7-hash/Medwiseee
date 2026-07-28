@@ -22,10 +22,12 @@ export default function Stage5_Recommendation({ data, onUpdate, onNext, onBack }
   const [result, setResult] = React.useState<AnalysisResult | null>(data.analysisResult || null);
   const [saving, setSaving] = React.useState(false);
   const [saveStatus, setSaveStatus] = React.useState<'idle' | 'success' | 'error'>('idle');
+  const requestCountRef = React.useRef(0);
   const abortControllerRef = React.useRef<AbortController | null>(null);
   const reportRef = React.useRef<HTMLDivElement>(null);
 
   const performAnalysis = async () => {
+    const requestId = ++requestCountRef.current;
     setLoading(true);
     setError(null);
     
@@ -34,28 +36,38 @@ export default function Stage5_Recommendation({ data, onUpdate, onNext, onBack }
       abortControllerRef.current.abort('New analysis started');
     }
     // Create new abort controller for this request
-    abortControllerRef.current = new AbortController();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     try {
       const res = await analyzeSepsisTherapy(data, { 
-        signal: abortControllerRef.current.signal 
+        signal: controller.signal 
       });
-      setResult(res);
-      onUpdate(res);
-    } catch (err) {
+      
+      // Only update if this is still the active request
+      if (requestId === requestCountRef.current) {
+        setResult(res);
+        onUpdate(res);
+      }
+    } catch (err: any) {
+      // Only handle error if this is still the active request
+      if (requestId !== requestCountRef.current) return;
+
       if (err instanceof Error && (err.name === 'AbortError' || (err as any).type === 'ABORTED')) {
         console.log('Analysis aborted:', err.message);
         return;
       }
-      console.error(err);
+      
+      console.error('Analysis failed:', err);
+      
       if (err instanceof GeminiError) {
         let message = '';
         switch (err.type) {
           case 'RATE_LIMIT':
-            message = 'The service is temporarily overloaded. Please try again in a few moments.';
+            message = 'The AI service is currently busy. Please wait a moment and try again.';
             break;
           case 'INVALID_KEY':
-            message = 'API Configuration Error: The Gemini API key is missing or invalid.';
+            message = 'Authentication error with the AI service. Please verify configuration.';
             break;
           case 'NETWORK_ERROR':
             message = 'Network connection failure. Please check your internet and try again.';
@@ -64,21 +76,23 @@ export default function Stage5_Recommendation({ data, onUpdate, onNext, onBack }
             message = 'The AI provided an incompatible response format. Retrying may help.';
             break;
           case 'ABORTED':
-            message = 'Analysis was cancelled.';
-            break;
+            return; // Already handled above but for safety
           default:
             message = err.message || 'An unexpected error occurred during clinical analysis.';
         }
         setError({ message, type: err.type });
       } else {
         setError({ 
-          message: 'Analysis failed due to an unexpected system error. Please retry.', 
+          message: err.message || 'Analysis failed due to an unexpected system error. Please retry.', 
           type: 'UNKNOWN' 
         });
       }
     } finally {
-      setLoading(false);
-      abortControllerRef.current = null;
+      // Only clear loading state if this was the last request
+      if (requestId === requestCountRef.current) {
+        setLoading(false);
+        abortControllerRef.current = null;
+      }
     }
   };
 
@@ -192,7 +206,7 @@ export default function Stage5_Recommendation({ data, onUpdate, onNext, onBack }
           <AlertCircle className="w-10 h-10 text-nejm-red" />
         </div>
         <div className="text-center max-w-md">
-          <p className="text-xl font-serif font-bold text-nejm-navy mb-2">Analysis Interrupted</p>
+          <p className="text-xl font-serif font-bold text-nejm-navy mb-2">Analysis Failed</p>
           <div className="p-4 bg-nejm-gray/5 border border-nejm-border mb-6">
             <p className="text-xs font-bold uppercase tracking-widest text-nejm-text/40 mb-1">Error Type: {error.type}</p>
             <p className="text-sm text-nejm-text/70">{error.message}</p>

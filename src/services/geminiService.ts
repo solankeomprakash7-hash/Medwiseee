@@ -1,4 +1,4 @@
-import { Type, GeminiOptions } from "../lib/gemini";
+import { Type, GeminiOptions, GeminiError } from "../lib/gemini";
 import { PatientData, AnalysisResult } from "../types";
 
 export const analyzeSepsisTherapy = async (data: PatientData, options: GeminiOptions = {}): Promise<AnalysisResult> => {
@@ -89,26 +89,36 @@ ${data.localAntibiogram.map(e => `- ${e.organism} vs ${e.antibiotic}: ${e.suscep
     required: ["summary", "confidenceScore", "empiric_recommendation", "clinical_reasoning", "safety_stewardship"]
   };
 
-  const response = await fetch('/api/analyze', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ 
-      prompt, 
-      schema, 
-      options: {
-        model: "gemini-3.6-flash",
-        maxRetries: 2,
-        timeout: 120000,
-        ...options
+  try {
+    const response = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        prompt, 
+        schema, 
+        options: {
+          model: "gemini-3.6-flash",
+          maxRetries: 2,
+          timeout: 120000,
+          ...options
+        }
+      }),
+      signal: options.signal
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      if (errorData.type) {
+        throw new GeminiError(errorData.type, errorData.error || `Server returned ${response.status}`);
       }
-    }),
-    signal: options.signal
-  });
+      throw new Error(errorData.error || `Server returned ${response.status}`);
+    }
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error || `Server returned ${response.status}`);
+    return await response.json();
+  } catch (err: any) {
+    if (err.name === 'AbortError') {
+      throw new GeminiError('ABORTED', options.signal?.reason || 'Request was cancelled.');
+    }
+    throw err;
   }
-
-  return await response.json();
 };
