@@ -39,7 +39,8 @@ export default function AuthScreen() {
       if (err.code === 'auth/popup-blocked') {
         setError('Popup blocked by browser. Please allow popups for this site.');
       } else if (err.code === 'auth/unauthorized-domain') {
-        setError('Domain not authorized. Please add this domain to "Authorized domains" in Firebase Console.');
+        const currentDomain = window.location.hostname;
+        setError(`Domain not authorized. Please add "${currentDomain}" to "Authorized domains" in your Firebase Console (Authentication > Settings > Authorized domains).`);
       } else if (err.code === 'auth/popup-closed-by-user') {
         setError('Sign in cancelled: popup was closed.');
       } else {

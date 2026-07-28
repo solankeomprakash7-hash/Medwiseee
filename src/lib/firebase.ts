@@ -14,6 +14,7 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+// No-op for analytics on server side
 export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 export const auth = getAuth(app);
 export const db = getFirestore(app);
@@ -64,17 +65,5 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   console.error('Firestore Error: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
 }
-
-// Connection test
-async function testConnection() {
-  try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error("Please check your Firebase configuration.");
-    }
-  }
-}
-testConnection();
 
 export default app;

@@ -2,8 +2,12 @@ import * as React from 'react';
 import { PatientData, AnalysisResult, Recommendation } from '../../types';
 import { analyzeSepsisTherapy } from '../../services/geminiService';
 import { GeminiError } from '../../lib/gemini';
-import { AlertCircle, BookOpen, CheckCircle2, ChevronLeft, ChevronRight, Info, Loader2, ShieldCheck, ShieldX, Sparkles, TrendingUp } from 'lucide-react';
+import { AlertCircle, BookOpen, CheckCircle2, ChevronLeft, ChevronRight, Info, Loader2, ShieldCheck, ShieldX, Sparkles, TrendingUp, Download, Save, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { jsPDF } from 'jspdf';
+import * as htmlToImage from 'html-to-image';
+import { auth, db } from '../../lib/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 interface Stage5Props {
   data: PatientData;
@@ -16,12 +20,19 @@ export default function Stage5_Recommendation({ data, onUpdate, onNext, onBack }
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<{ message: string, type: string } | null>(null);
   const [result, setResult] = React.useState<AnalysisResult | null>(data.analysisResult || null);
+  const [saving, setSaving] = React.useState(false);
+  const [saveStatus, setSaveStatus] = React.useState<'idle' | 'success' | 'error'>('idle');
   const abortControllerRef = React.useRef<AbortController | null>(null);
+  const reportRef = React.useRef<HTMLDivElement>(null);
 
   const performAnalysis = async () => {
     setLoading(true);
     setError(null);
     
+    // Abort previous request if any
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort('New analysis started');
+    }
     // Create new abort controller for this request
     abortControllerRef.current = new AbortController();
 
@@ -32,6 +43,10 @@ export default function Stage5_Recommendation({ data, onUpdate, onNext, onBack }
       setResult(res);
       onUpdate(res);
     } catch (err) {
+      if (err instanceof Error && (err.name === 'AbortError' || (err as any).type === 'ABORTED')) {
+        console.log('Analysis aborted:', err.message);
+        return;
+      }
       console.error(err);
       if (err instanceof GeminiError) {
         let message = '';
@@ -67,6 +82,82 @@ export default function Stage5_Recommendation({ data, onUpdate, onNext, onBack }
     }
   };
 
+  const savePatientRecord = async () => {
+    if (!auth.currentUser || !result) return;
+    
+    setSaving(true);
+    setSaveStatus('idle');
+    try {
+      await addDoc(collection(db, 'patient_sessions'), {
+        userId: auth.currentUser.uid,
+        userEmail: auth.currentUser.email,
+        createdAt: Date.now(),
+        serverTimestamp: serverTimestamp(),
+        currentStage: 'recommendation',
+        completed: true,
+        data: {
+          ...data,
+          analysisResult: result
+        }
+      });
+      setSaveStatus('success');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    } catch (err) {
+      console.error('Error saving record:', err);
+      setSaveStatus('error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const exportToPDF = async () => {
+    if (!reportRef.current) return;
+    
+    // Create a temporary style adjustment for PDF capture
+    const element = reportRef.current;
+    const pdfOnlyElements = element.querySelectorAll('.pdf-only') as NodeListOf<HTMLElement>;
+    
+    // Show PDF only elements
+    pdfOnlyElements.forEach(el => {
+      el.style.display = 'flex';
+    });
+    
+    try {
+      // Use html-to-image to generate a high-quality PNG
+      const dataUrl = await htmlToImage.toPng(element, {
+        quality: 1,
+        pixelRatio: 2,
+        backgroundColor: '#ffffff',
+        style: {
+          transform: 'none',
+          margin: '0',
+          padding: '20px'
+        }
+      });
+      
+      const img = new Image();
+      img.src = dataUrl;
+      await new Promise(resolve => img.onload = resolve);
+      
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'px',
+        format: [img.width / 2, img.height / 2]
+      });
+      
+      pdf.addImage(dataUrl, 'PNG', 0, 0, img.width / 2, img.height / 2);
+      pdf.save(`MedWise-Recommendation-${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (err) {
+      console.error('PDF Export failed:', err);
+      alert('PDF export failed. Please try again.');
+    } finally {
+      // Restore hidden state
+      pdfOnlyElements.forEach(el => {
+        el.style.display = '';
+      });
+    }
+  };
+
   React.useEffect(() => {
     if (!result) {
       performAnalysis();
@@ -77,7 +168,7 @@ export default function Stage5_Recommendation({ data, onUpdate, onNext, onBack }
     return () => {
       // Cleanup: abort any ongoing request on unmount
       if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
+        abortControllerRef.current.abort('Component unmounted');
       }
     };
   }, []);
@@ -121,50 +212,104 @@ export default function Stage5_Recommendation({ data, onUpdate, onNext, onBack }
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
-      <div className="flex justify-between items-start">
+      <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
         <div className="nejm-header">
           <h2 className="text-2xl font-serif font-bold">Stage 5: Empiric Recommendations</h2>
           <p className="text-sm text-nejm-text/70 mt-1">AI-augmented stewardship guidance based on host risk and local ecology.</p>
         </div>
-        <div className="flex items-center gap-2 px-3 py-1 bg-nejm-blue/10 border border-nejm-blue/20">
-          <TrendingUp size={14} className="text-nejm-blue" />
-          <span className="text-[10px] font-bold uppercase tracking-widest text-nejm-blue">Confidence: {result?.confidenceScore}%</span>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 px-3 py-1 bg-nejm-blue/10 border border-nejm-blue/20">
+            <TrendingUp size={14} className="text-nejm-blue" />
+            <span className="text-[10px] font-bold uppercase tracking-widest text-nejm-blue">Confidence: {result?.confidenceScore}%</span>
+          </div>
+          
+          <div className="flex gap-2">
+            <button 
+              onClick={exportToPDF}
+              className="flex items-center gap-2 px-3 py-2 border border-nejm-border bg-white text-[10px] font-bold uppercase tracking-widest text-nejm-text hover:bg-nejm-gray transition-colors"
+              title="Export as PDF"
+            >
+              <Download size={14} /> PDF
+            </button>
+            <button 
+              onClick={savePatientRecord}
+              disabled={saving || saveStatus === 'success'}
+              className={`flex items-center gap-2 px-3 py-2 border text-[10px] font-bold uppercase tracking-widest transition-all ${
+                saveStatus === 'success' 
+                ? 'bg-green-600 border-green-600 text-white' 
+                : 'border-nejm-border bg-white text-nejm-text hover:bg-nejm-gray'
+              }`}
+            >
+              {saving ? <Loader2 size={14} className="animate-spin" /> : saveStatus === 'success' ? <CheckCircle2 size={14} /> : <Save size={14} />}
+              {saveStatus === 'success' ? 'Saved' : 'Save'}
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left: Executive Summary */}
-        <div className="lg:col-span-4 space-y-6">
-          <section className="p-6 bg-white border border-nejm-border shadow-sm">
-            <h3 className="nejm-section-title mb-4">Executive Summary</h3>
-            <p className="text-sm leading-relaxed text-nejm-text/80 font-serif italic">
-              "{result?.summary}"
-            </p>
-          </section>
-
-          <section className="p-6 bg-nejm-navy text-white">
-            <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-60 mb-4">Clinical Reasoning</h3>
-            <p className="text-xs leading-relaxed opacity-90">
-              {result?.clinical_reasoning}
-            </p>
-          </section>
-          
-          <div className="p-4 bg-nejm-gray/10 border border-nejm-border/30">
-            <h4 className="text-[10px] font-bold uppercase tracking-widest text-nejm-text/50 mb-2 flex items-center gap-2">
-              <Sparkles size={12} /> Stewardship Note
-            </h4>
-            <p className="text-[10px] text-nejm-text/60 italic leading-relaxed">
-              {result?.safety_stewardship}
-            </p>
+      <div ref={reportRef} className="space-y-8 bg-white p-2">
+        <div className="hidden pdf-only flex justify-between items-center border-b pb-4 mb-4">
+          <div>
+            <h1 className="text-xl font-serif font-bold text-nejm-navy">MedWise AI Recommendation</h1>
+            <p className="text-[10px] uppercase tracking-widest text-nejm-text/50">Generated on {new Date().toLocaleString()}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] font-bold text-nejm-blue uppercase">Confidential Patient Report</p>
           </div>
         </div>
 
-        {/* Right: Recommendation Cards */}
-        <div className="lg:col-span-8 space-y-6">
-          <h3 className="nejm-section-title">Priority Empiric Regimens</h3>
-          {result?.empiric_recommendation.map((rec, idx) => (
-            <RecommendationCard key={idx} rec={rec} />
-          ))}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          {/* Left: Executive Summary */}
+          <div className="lg:col-span-4 space-y-6">
+            <section className="p-6 bg-white border border-nejm-border shadow-sm">
+              <h3 className="nejm-section-title mb-4">Executive Summary</h3>
+              <p className="text-sm leading-relaxed text-nejm-text/80 font-serif italic">
+                "{result?.summary}"
+              </p>
+            </section>
+
+            <section className="p-6 bg-nejm-navy text-white">
+              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-60 mb-4">Clinical Reasoning</h3>
+              <p className="text-xs leading-relaxed opacity-90">
+                {result?.clinical_reasoning}
+              </p>
+            </section>
+            
+            <div className="p-4 bg-nejm-gray/10 border border-nejm-border/30">
+              <h4 className="text-[10px] font-bold uppercase tracking-widest text-nejm-text/50 mb-2 flex items-center gap-2">
+                <Sparkles size={12} /> Stewardship Note
+              </h4>
+              <p className="text-[10px] text-nejm-text/60 italic leading-relaxed">
+                {result?.safety_stewardship}
+              </p>
+            </div>
+
+            <div className="p-4 border border-nejm-border bg-nejm-gray/5">
+              <h4 className="text-[10px] font-bold uppercase tracking-widest text-nejm-text/50 mb-3">Patient Profile Summary</h4>
+              <div className="space-y-2">
+                <div className="flex justify-between text-[10px]">
+                  <span className="text-nejm-text/40">Diagnosis:</span>
+                  <span className="font-bold text-nejm-text/70">{data.diagnosis}</span>
+                </div>
+                <div className="flex justify-between text-[10px]">
+                  <span className="text-nejm-text/40">Source:</span>
+                  <span className="font-bold text-nejm-text/70">{data.infectionSource}</span>
+                </div>
+                <div className="flex justify-between text-[10px]">
+                  <span className="text-nejm-text/40">Risk Factors:</span>
+                  <span className="font-bold text-nejm-text/70">{data.mdrRisk === 'Yes' ? 'MDR Risk' : 'Standard Risk'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Recommendation Cards */}
+          <div className="lg:col-span-8 space-y-6">
+            <h3 className="nejm-section-title">Priority Empiric Regimens</h3>
+            {result?.empiric_recommendation.map((rec, idx) => (
+              <RecommendationCard key={idx} rec={rec} />
+            ))}
+          </div>
         </div>
       </div>
 

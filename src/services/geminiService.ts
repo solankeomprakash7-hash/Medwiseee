@@ -98,6 +98,7 @@ ${data.localAntibiogram.map(e => `- ${e.organism} vs ${e.antibiotic}: ${e.suscep
       options: {
         model: "gemini-3.6-flash",
         maxRetries: 2,
+        timeout: 120000,
         ...options
       }
     }),

@@ -33,7 +33,7 @@ export async function geminiRequest<T>(
   const {
     model = "gemini-3.6-flash",
     maxRetries = 3,
-    timeout = 60000,
+    timeout = 120000,
     signal
   } = options;
 
@@ -107,7 +107,11 @@ export async function geminiRequest<T>(
         type = 'ABORTED';
       }
 
-      console.error(`[Gemini] Attempt ${attempt} failed (${type}):`, error.message || error);
+      const errorMessage = type === 'ABORTED' 
+        ? (signal?.reason || error.message || 'Request was cancelled.') 
+        : (error.message || 'An unexpected error occurred during the Gemini request.');
+
+      console.error(`[Gemini] Attempt ${attempt} failed (${type}):`, errorMessage);
 
       // Decide if we should retry
       const isRetryable = type === 'RATE_LIMIT' || type === 'NETWORK_ERROR' || type === 'UNKNOWN';
@@ -120,7 +124,7 @@ export async function geminiRequest<T>(
         if (signal) {
           await Promise.race([
             new Promise(resolve => setTimeout(resolve, delay)),
-            new Promise((_, reject) => signal.addEventListener('abort', () => reject(new GeminiError('ABORTED', 'Request was cancelled.'))))
+            new Promise((_, reject) => signal.addEventListener('abort', () => reject(new GeminiError('ABORTED', signal.reason || 'Request was cancelled.'))))
           ]);
         } else {
           await new Promise(resolve => setTimeout(resolve, delay));
@@ -131,7 +135,7 @@ export async function geminiRequest<T>(
       // If we're here, it's either a non-retryable error or we've exhausted retries
       throw new GeminiError(
         type,
-        type === 'ABORTED' ? 'Request was cancelled.' : (error.message || 'An unexpected error occurred during the Gemini request.'),
+        errorMessage,
         error
       );
     }
