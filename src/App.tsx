@@ -4,10 +4,7 @@ import { auth } from './lib/firebase';
 import AuthScreen from './components/AuthScreen';
 import { Stage, PatientData, Scores, Vitals, AnalysisResult } from './types';
 import ProgressTracker from './components/ProgressTracker';
-import Stage1_Trigger from './components/stages/Stage1_Trigger';
-import Stage2_Stratification from './components/stages/Stage2_Stratification';
-import Stage3_RiskLayering from './components/stages/Stage3_RiskLayering';
-import Stage4_Antibiogram from './components/stages/Stage4_Antibiogram';
+import ClinicalInput from './components/stages/ClinicalInput';
 import Stage5_Recommendation from './components/stages/Stage5_Recommendation';
 import Stage6_Timeline from './components/stages/Stage6_Timeline';
 import { LogOut, Stethoscope, User as UserIcon } from 'lucide-react';
@@ -17,7 +14,7 @@ const INITIAL_PATIENT_DATA: PatientData = {
   vitals: { temp: '', hr: '', rr: '', sbp: '', dbp: '', gcs: '', wbc: '' },
   scores: { qsofa: 0, sofa: 0, news2: 0, sepsisCriteriaMet: false },
   diagnosis: 'Sepsis',
-  infectionSource: '',
+  infectionSources: [],
   setting: 'Community',
   age: '',
   sex: 'Male',
@@ -28,7 +25,10 @@ const INITIAL_PATIENT_DATA: PatientData = {
   pregnancyStatus: 'No',
   transplantStatus: 'No',
   neutropeniaStatus: 'No',
+  sourceControl: 'Unknown',
+  microbiologyStatus: 'No microbiology',
   mdrRisk: 'No',
+  mdrHistory: '',
   recentHospitalization: 'No',
   priorAntibiotics: 'No',
   priorAntibioticsDetails: '',
@@ -36,13 +36,14 @@ const INITIAL_PATIENT_DATA: PatientData = {
   indwellingDevices: 'No',
   travelHistory: 'No',
   comorbidities: '',
+  allergies: '',
   timelineEvents: []
 };
 
 export default function App() {
   const [user, setUser] = React.useState<User | null>(null);
   const [loading, setLoading] = React.useState(true);
-  const [currentStage, setCurrentStage] = React.useState<Stage>(Stage.TRIGGER);
+  const [currentStage, setCurrentStage] = React.useState<Stage>(Stage.INPUT);
   const [completedStages, setCompletedStages] = React.useState<Stage[]>([]);
   const [patientData, setPatientData] = React.useState<PatientData>(INITIAL_PATIENT_DATA);
 
@@ -149,35 +150,11 @@ export default function App() {
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.3 }}
               >
-                {currentStage === Stage.TRIGGER && (
-                  <Stage1_Trigger 
-                    vitals={patientData.vitals} 
-                    onUpdate={(v, s) => updatePatientData({ vitals: v, scores: s })} 
+                {currentStage === Stage.INPUT && (
+                  <ClinicalInput 
+                    data={patientData} 
+                    onUpdate={updatePatientData} 
                     onNext={nextStage} 
-                  />
-                )}
-                {currentStage === Stage.STRATIFICATION && (
-                  <Stage2_Stratification 
-                    data={patientData} 
-                    onUpdate={updatePatientData} 
-                    onNext={nextStage}
-                    onBack={prevStage}
-                  />
-                )}
-                {currentStage === Stage.RISK_LAYERING && (
-                  <Stage3_RiskLayering 
-                    data={patientData} 
-                    onUpdate={updatePatientData} 
-                    onNext={nextStage}
-                    onBack={prevStage}
-                  />
-                )}
-                {currentStage === Stage.ANTIBIOGRAM && (
-                  <Stage4_Antibiogram 
-                    data={patientData} 
-                    onUpdate={updatePatientData} 
-                    onNext={nextStage}
-                    onBack={prevStage}
                   />
                 )}
                 {currentStage === Stage.RECOMMENDATION && (

@@ -10,13 +10,21 @@ interface Stage6Props {
 }
 
 export default function Stage6_Timeline({ data, onUpdate, onBack }: Stage6Props) {
-  const durationInfo = DURATION_LOOKUP[data.infectionSource as keyof typeof DURATION_LOOKUP] || { range: '7 days', citation: 'General Guidelines' };
+  const sources = data.infectionSources || [];
+  const durationInfos = sources.map(s => DURATION_LOOKUP[s as keyof typeof DURATION_LOOKUP] || { range: '7 days', citation: 'General Guidelines' });
+  
+  // Basic logic to pick "max" duration - very simple string parsing for this demo
+  const durationInfo = durationInfos.reduce((prev, curr) => {
+    const prevVal = parseInt(prev.range) || 0;
+    const currVal = parseInt(curr.range) || 0;
+    return currVal > prevVal ? curr : prev;
+  }, { range: '7 days', citation: 'General Guidelines' });
 
   const timelineEvents = [
     { day: 0, label: 'Hour 0-1', desc: 'Blood cultures, lactate, and initiation of empiric therapy.', icon: <FlaskConical size={14} />, status: 'completed' },
     { day: 1, label: 'Day 1 (24h)', desc: 'Re-evaluate clinical response, check initial culture growth.', icon: <History size={14} />, status: 'active' },
     { day: 3, label: 'Day 3 (72h)', desc: 'Mandatory de-escalation check. Culture-directed therapy.', icon: <Scissors size={14} />, status: 'pending' },
-    { day: 7, label: `Day ${durationInfo.range.split(' ')[0]}`, desc: `Target completion based on ${data.infectionSource}.`, icon: <Calendar size={14} />, status: 'pending' },
+    { day: 7, label: `Day ${durationInfo.range.split(' ')[0]}`, desc: `Target completion based on ${sources.join(' & ')}.`, icon: <Calendar size={14} />, status: 'pending' },
   ];
 
   return (
@@ -80,7 +88,7 @@ export default function Stage6_Timeline({ data, onUpdate, onBack }: Stage6Props)
             </h3>
             <div className="mb-4">
               <p className="text-3xl font-serif font-bold">{durationInfo.range}</p>
-              <p className="text-[10px] opacity-70 mt-1">Infection: {data.infectionSource}</p>
+              <p className="text-[10px] opacity-70 mt-1">Infection: {sources.join(', ')}</p>
             </div>
             <div className="pt-4 border-t border-white/20">
               <p className="text-[9px] font-bold uppercase tracking-widest opacity-60 mb-1">Citation</p>

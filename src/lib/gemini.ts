@@ -42,13 +42,20 @@ export async function geminiRequest<T>(
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
+    console.error('[Gemini] API Key Missing from process.env');
     throw new GeminiError(
       'INVALID_KEY', 
-      'GEMINI_API_KEY is not defined. Please ensure it is set in your environment variables.'
+      'GEMINI_API_KEY is not defined. Please ensure it is set in your Vercel environment variables.'
     );
   }
 
-  const ai = new GoogleGenAI({ apiKey });
+  let ai: GoogleGenAI;
+  try {
+    ai = new GoogleGenAI({ apiKey });
+  } catch (err: any) {
+    console.error('[Gemini] Failed to initialize GoogleGenAI:', err);
+    throw new GeminiError('INVALID_KEY', 'Failed to initialize Gemini SDK. Check API key format.', err);
+  }
 
   let lastError: any;
 

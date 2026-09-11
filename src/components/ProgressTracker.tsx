@@ -8,12 +8,9 @@ interface ProgressTrackerProps {
 }
 
 const STAGES = [
-  { id: Stage.TRIGGER, label: 'Trigger & Recognition', icon: '1' },
-  { id: Stage.STRATIFICATION, label: 'Stratification', icon: '2' },
-  { id: Stage.RISK_LAYERING, label: 'Risk Layering', icon: '3' },
-  { id: Stage.ANTIBIOGRAM, label: 'Antibiogram', icon: '4' },
-  { id: Stage.RECOMMENDATION, label: 'Recommendation', icon: '5' },
-  { id: Stage.TIMELINE, label: 'Stewardship Timeline', icon: '6' },
+  { id: Stage.INPUT, label: 'Clinical Input', icon: '1' },
+  { id: Stage.RECOMMENDATION, label: 'Analysis & Decision', icon: '2' },
+  { id: Stage.TIMELINE, label: 'Stewardship Timeline', icon: '3' },
 ];
 
 export default function ProgressTracker({ currentStage, completedStages }: ProgressTrackerProps) {
